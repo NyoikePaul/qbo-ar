@@ -9,7 +9,7 @@ from decimal import Decimal
 from typing import Any
 
 from .models import Invoice
-from .util import quantize_money
+from .util import JsonlLog, quantize_money, request_id_for
 
 ZERO = Decimal("0")
 MAX_REF_LEN = 21  # QuickBooks limit for PaymentRefNum
@@ -125,3 +125,51 @@ def build_payment_payload(
     if payment_method_id:
         payload["PaymentMethodRef"] = {"value": payment_method_id}
     return payload
+
+
+@dataclass(frozen=True)
+class PaymentResult:
+    payment_id: str | None
+    allocations: tuple[Allocation, ...]
+    unapplied: Decimal
+    duplicate: bool = False
+
+
+def record_payment(
+    client: Any,
+    customer_id: str,
+    amount: Decimal,
+    invoices: Iterable[Invoice],
+    *,
+    reference: str,
+    txn_date: date,
+    strategy: str = "oldest_first",
+    targets: Mapping[str, Decimal | None] | None = None,
+    note: str | None = None,
+    deposit_account_id: str | None = None,
+    payment_method_id: str | None = None,
+    log: JsonlLog | None = None,
+) -> PaymentResult:
+    """Allocate and post a receipt, at most once per `reference`.
+
+    `reference` is the bank/M-Pesa transaction id. Two layers stop double posting: a local
+    log (checked first, written only after QuickBooks confirms) and a `requestid` derived from
+    the reference, so a retried HTTP call is de-duplicated by QuickBooks itself.
+    """
+    if not reference:
+        raise ValueError("A transaction reference is required for idempotent posting")
+    key = f"payment:{reference}"
+    if log is not None and log.seen(key):
+        return PaymentResult(None, (), Decimal(0), duplicate=True)
+
+    result = allocate(amount, invoices, strategy=strategy, targets=targets)
+    payload = build_payment_payload(
+        customer_id, amount, result.allocations, txn_date=txn_date, reference=reference,
+        note=note, deposit_account_id=deposit_account_id, payment_method_id=payment_method_id,
+    )
+    rid = request_id_for("payment", customer_id, reference, payload["TotalAmt"])
+    response = client.post("payment", payload, request_id=rid)
+    payment_id = str(response["Payment"]["Id"])
+    if log is not None:
+        log.add(key, payment_id=payment_id, customer_id=customer_id, amount=str(amount))
+    return PaymentResult(payment_id, result.allocations, result.unapplied)

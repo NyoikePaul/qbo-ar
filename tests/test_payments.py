@@ -4,7 +4,8 @@ from decimal import Decimal
 import pytest
 
 from qbo_ar.models import Invoice
-from qbo_ar.payments import Allocation, allocate, build_payment_payload
+from qbo_ar.payments import Allocation, allocate, build_payment_payload, record_payment
+from qbo_ar.util import JsonlLog
 
 
 def inv(id_, balance, due, doc=None, currency="KES", txn="2026-09-01"):
@@ -110,3 +111,58 @@ def test_payload_links_invoices_and_truncates_reference():
 def test_unapplied_only_payload_has_no_lines():
     payload = build_payment_payload("5", Decimal("80"), [], txn_date=date(2026, 10, 30))
     assert payload["Line"] == [] and "PaymentRefNum" not in payload
+
+
+class PostRecorder:
+    def __init__(self, fail=False):
+        self.calls, self.fail = [], fail
+
+    def post(self, endpoint, json=None, **kw):
+        self.calls.append((endpoint, json, kw))
+        if self.fail:
+            raise RuntimeError("QBO down")
+        return {"Payment": {"Id": "501"}}
+
+
+def test_record_payment_posts_and_logs(tmp_path):
+    client, log = PostRecorder(), JsonlLog(tmp_path / "p.jsonl")
+    res = record_payment(
+        client, "5", Decimal("250"), INVOICES, reference="UJ12ABCD34", txn_date=date(2026, 10, 30),
+        log=log,
+    )
+    assert res.payment_id == "501" and res.unapplied == 0
+    endpoint, body, kw = client.calls[0]
+    assert endpoint == "payment" and body["PaymentRefNum"] == "UJ12ABCD34"
+    assert len(kw["request_id"]) <= 50
+    assert log.seen("payment:UJ12ABCD34")
+
+
+def test_same_reference_is_never_posted_twice(tmp_path):
+    client, log = PostRecorder(), JsonlLog(tmp_path / "p.jsonl")
+    args = dict(reference="UJ12ABCD34", txn_date=date(2026, 10, 30), log=log)
+    record_payment(client, "5", Decimal("100"), INVOICES, **args)
+    again = record_payment(client, "5", Decimal("100"), INVOICES, **args)
+    assert again.duplicate and again.payment_id is None
+    assert len(client.calls) == 1
+    # a fresh process reading the same log file also refuses
+    third = record_payment(client, "5", Decimal("100"), INVOICES, reference="UJ12ABCD34",
+                           txn_date=date(2026, 10, 30), log=JsonlLog(tmp_path / "p.jsonl"))
+    assert third.duplicate and len(client.calls) == 1
+
+
+def test_failed_post_is_not_logged_so_it_can_be_retried(tmp_path):
+    log = JsonlLog(tmp_path / "p.jsonl")
+    with pytest.raises(RuntimeError):
+        record_payment(PostRecorder(fail=True), "5", Decimal("100"), INVOICES,
+                       reference="UJ1", txn_date=date(2026, 10, 30), log=log)
+    assert not log.seen("payment:UJ1")
+
+
+def test_request_id_stable_per_reference_and_requires_reference():
+    a, b = PostRecorder(), PostRecorder()
+    kwargs = dict(reference="UJ9", txn_date=date(2026, 10, 30))
+    record_payment(a, "5", Decimal("100"), INVOICES, **kwargs)
+    record_payment(b, "5", Decimal("100"), INVOICES, **kwargs)
+    assert a.calls[0][2]["request_id"] == b.calls[0][2]["request_id"]
+    with pytest.raises(ValueError):
+        record_payment(a, "5", Decimal("100"), INVOICES, reference="", txn_date=date(2026, 10, 30))
