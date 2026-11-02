@@ -260,6 +260,7 @@ class QBWCRequestQueue:
         error_code: str,
         error_message: str,
         retryable: bool = True,
+        response_xml: str | None = None,
     ) -> QBWCJob:
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -278,10 +279,12 @@ class QBWCRequestQueue:
             db.execute("""
                 UPDATE qbwc_jobs
                 SET state = ?, error_code = ?,
-                    error_message = ?, updated_at = ?
+                    error_message = ?, response_xml = COALESCE(?, response_xml),
+                    updated_at = ?
                 WHERE job_id = ?
             """, (
-                state, error_code, error_message, time.time(), job_id,
+                state, error_code, error_message, response_xml,
+                time.time(), job_id,
             ))
 
             updated = db.execute(
@@ -292,6 +295,26 @@ class QBWCRequestQueue:
         result = self._from_row(updated)
         assert result is not None
         return result
+
+
+    def pending_count(self, *, company_file: str | None = None) -> int:
+        """Count pending jobs, optionally scoped to a company file."""
+        with self._connect() as db:
+            if company_file is None:
+                row = db.execute(
+                    "SELECT COUNT(*) AS total FROM qbwc_jobs WHERE state = 'pending'"
+                ).fetchone()
+            else:
+                row = db.execute(
+                    """
+                    SELECT COUNT(*) AS total
+                    FROM qbwc_jobs
+                    WHERE state = 'pending' AND company_file = ?
+                    """,
+                    (company_file,),
+                ).fetchone()
+
+        return int(row["total"])
 
     def counts(self) -> dict[str, int]:
         result = {
