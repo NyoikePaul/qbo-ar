@@ -5,3 +5,9 @@ __pycache__/
 .DS_Store
 .vscode/
 .venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+.qbo_ar/
