@@ -75,6 +75,8 @@ def build_parser() -> argparse.ArgumentParser:
     rec = sub.add_parser("reconcile", help="match a bank/M-Pesa statement CSV to open invoices")
     rec.add_argument("--tolerance", default="0",
                      help="KES band: short-pays inside it are flagged; overpays inside it stay put")
+    rec.add_argument("--queue", metavar="CSV",
+                     help="write unmatched/probable lines with suggested customers to this CSV")
     rec.add_argument("--rollover", action="store_true",
                      help="with --apply: spread an overpayment over the customer's other open "
                           "invoices, oldest first")
@@ -176,11 +178,18 @@ def _cmd_reconcile(client: Any, args: argparse.Namespace) -> int:
     rows = [[r.line.txn_id, _money(r.line.amount), r.line.reference, r.status,
              (r.invoice.doc_number if r.invoice else "") or "", r.reason] for r in results]
     print(_table(["Txn", "Amount", "Reference", "Status", "Invoice", "Note"], rows))
+    from .suspense import DEFAULT_PAYER_MAP, PayerMap, learn_from_posted, write_queue
+
+    payers = PayerMap(DEFAULT_PAYER_MAP)
+    if args.queue:
+        count = write_queue(args.queue, results, invoices, payers)
+        print(f"\nWrote {count} line(s) to {args.queue} for review.")
     if args.apply:
         summary = apply_matches(client, results, log, deposit_account_id=args.deposit_account,
                                 all_open=invoices, rollover=args.rollover,
                                 tolerance=args.tolerance)
         print(f"\nPosted {len(summary.posted)} payment(s); {len(summary.skipped)} left for review.")
+        learn_from_posted(payers, summary)
     else:
         matched = sum(r.status == "matched" for r in results)
         print(f"\nDry run: {matched} line(s) would be posted. Re-run with --apply.")
