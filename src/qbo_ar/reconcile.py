@@ -16,7 +16,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, TextIO
 
 from .models import Invoice
-from .payments import PaymentResult, record_payment
+from .payments import PaymentResult, _oldest_first_key, record_payment
 from .util import JsonlLog
 
 DEFAULT_COLUMNS = {
@@ -112,7 +112,9 @@ def match_lines(
     invoices: Iterable[Invoice],
     *,
     already_processed: Callable[[str], bool] = lambda _txn: False,
+    tolerance: Decimal | int | str = 0,
 ) -> list[MatchResult]:
+    tolerance = Decimal(str(tolerance))
     open_ = [i for i in invoices if i.balance > 0]
     by_ref: dict[str, Invoice] = {}
     ambiguous: set[str] = set()
@@ -141,7 +143,13 @@ def match_lines(
             if ln.amount == inv.balance:
                 note, score = "reference and amount match", 100
             elif ln.amount < inv.balance:
-                note, score = f"partial: paid {ln.amount} of {inv.balance}", 90
+                short = inv.balance - ln.amount
+                if short <= tolerance:
+                    note = f"within tolerance: short by {short}; residual stays open"
+                    score = 95
+                else:
+                    note = f"partial: paid {ln.amount} of {inv.balance}; {short} remains"
+                    score = 90
             else:
                 note = f"overpaid by {ln.amount - inv.balance}; excess stays as credit"
                 score = 90
@@ -180,18 +188,46 @@ def apply_matches(
     log: JsonlLog,
     *,
     deposit_account_id: str | None = None,
+    all_open: Iterable[Invoice] | None = None,
+    rollover: bool = False,
+    tolerance: Decimal | int | str = 0,
 ) -> ApplySummary:
     """Post only `matched` lines. probable/unmatched/duplicate are left for a human."""
+    tolerance = Decimal(str(tolerance))
+    all_open = list(all_open or [])
     summary = ApplySummary()
     for res in results:
         if res.status != "matched" or res.invoice is None or res.invoice.customer_id is None:
             summary.skipped.append(res)
             continue
+        pool, strategy, targets = [res.invoice], "oldest_first", None
+        excess = res.line.amount - res.invoice.balance
+        if rollover and excess > tolerance:
+            inv0 = res.invoice
+            others = sorted(
+                (
+                    i for i in all_open
+                    if i.customer_id == inv0.customer_id and i.id != inv0.id
+                    and i.currency == inv0.currency and i.balance > 0
+                ),
+                key=_oldest_first_key,
+            )
+            targets = {inv0.id: None}
+            left = excess
+            for other in others:
+                if left <= 0:
+                    break
+                take = min(left, other.balance)
+                targets[other.id] = take
+                left -= take
+            pool, strategy = [inv0, *others], "specific"
         payment = record_payment(
             client,
             res.invoice.customer_id,
             res.line.amount,
-            [res.invoice],
+            pool,
+            strategy=strategy,
+            targets=targets,
             reference=res.line.txn_id,
             txn_date=res.line.date or date.today(),
             note=f"Statement ref: {res.line.reference}",

@@ -131,3 +131,16 @@ def test_confidence_scores():
     assert res["UJ1AAA"].confidence == 100  # exact ref, exact amount
     assert res["UJ2BBB"].confidence == 90  # exact ref, partial payment
     assert res["UJ4DDD"].confidence == 70  # bad ref, unique amount
+
+
+def test_short_pay_within_tolerance_is_flagged():
+    ln = StatementLine("UJ8", date(2026, 10, 30), Decimal("44998"), "CO-2026-00446")
+    res = match_lines([ln], INVOICES, tolerance=5)[0]
+    assert res.status == "matched" and res.confidence == 95
+    assert "tolerance" in res.reason
+
+
+def test_partial_beyond_tolerance_reports_remaining():
+    ln = StatementLine("UJ7", date(2026, 10, 30), Decimal("500"), "CO202600447")
+    res = match_lines([ln], INVOICES, tolerance=5)[0]
+    assert res.confidence == 90 and "500 remains" in res.reason
