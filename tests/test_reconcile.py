@@ -116,3 +116,18 @@ def test_apply_posts_only_matched_lines_once(tmp_path):
     rerun = match_lines(lines(), INVOICES, already_processed=lambda t: log.seen(f"payment:{t}"))
     again = apply_matches(client, rerun, log)
     assert again.posted == [] and len(client.calls) == 2
+
+
+def test_invoice_number_inside_reference_is_probable_not_matched():
+    ln = StatementLine("UJ9", date(2026, 10, 30), Decimal("45000"), "INV CO-2026-00446 thanks")
+    res = match_lines([ln], INVOICES)[0]
+    assert res.status == "probable"
+    assert res.invoice.doc_number == "CO-2026-00446"
+    assert res.confidence == 85
+
+
+def test_confidence_scores():
+    res = {r.line.txn_id: r for r in match_lines(lines(), INVOICES)}
+    assert res["UJ1AAA"].confidence == 100  # exact ref, exact amount
+    assert res["UJ2BBB"].confidence == 90  # exact ref, partial payment
+    assert res["UJ4DDD"].confidence == 70  # bad ref, unique amount
