@@ -91,6 +91,20 @@ class MatchResult:
     status: str  # matched | probable | unmatched | duplicate
     invoice: Invoice | None = None
     reason: str = ""
+    confidence: int = 0  # 100 exact, 90 partial/over, 85 ref in text, 70 amount only
+
+
+def _invoice_in_text(
+    texts: Iterable[str | None], by_ref: dict[str, Invoice], ambiguous: set[str]
+) -> Invoice | None:
+    """An invoice number typed inside free text ('INV CO-2026-00446 thanks'), if exactly one."""
+    found: set[str] = set()
+    for text in texts:
+        for token in re.split(r"[\s,;:/|]+", text or ""):
+            key = normalize_ref(token)
+            if key and key in by_ref and key not in ambiguous:
+                found.add(key)
+    return by_ref[next(iter(found))] if len(found) == 1 else None
 
 
 def match_lines(
@@ -125,18 +139,28 @@ def match_lines(
         inv = by_ref.get(key) if key and key not in ambiguous else None
         if inv is not None:
             if ln.amount == inv.balance:
-                note = "reference and amount match"
+                note, score = "reference and amount match", 100
             elif ln.amount < inv.balance:
-                note = f"partial: paid {ln.amount} of {inv.balance}"
+                note, score = f"partial: paid {ln.amount} of {inv.balance}", 90
             else:
                 note = f"overpaid by {ln.amount - inv.balance}; excess stays as credit"
-            results.append(MatchResult(ln, "matched", inv, note))
+                score = 90
+            results.append(MatchResult(ln, "matched", inv, note, score))
+            continue
+
+        in_text = _invoice_in_text((ln.reference, ln.payer), by_ref, ambiguous)
+        if in_text is not None:
+            results.append(
+                MatchResult(ln, "probable", in_text, "invoice number found in reference text", 85)
+            )
             continue
 
         same_amount = [i for i in open_ if i.balance == ln.amount]
         if len(same_amount) == 1:
             results.append(
-                MatchResult(ln, "probable", same_amount[0], "unique open invoice with this amount")
+                MatchResult(
+                    ln, "probable", same_amount[0], "unique open invoice with this amount", 70
+                )
             )
         else:
             why = "ambiguous reference" if key in ambiguous else "no matching reference"
