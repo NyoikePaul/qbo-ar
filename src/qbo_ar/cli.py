@@ -73,6 +73,11 @@ def build_parser() -> argparse.ArgumentParser:
     dun.add_argument("--send", action="store_true", help="actually resend invoices via QuickBooks")
 
     rec = sub.add_parser("reconcile", help="match a bank/M-Pesa statement CSV to open invoices")
+    rec.add_argument("--tolerance", default="0",
+                     help="KES band: short-pays inside it are flagged; overpays inside it stay put")
+    rec.add_argument("--rollover", action="store_true",
+                     help="with --apply: spread an overpayment over the customer's other open "
+                          "invoices, oldest first")
     rec.add_argument("statement", type=argparse.FileType("r"))
     rec.add_argument("--map", action="append", default=[], metavar="FIELD=COLUMN",
                      help="override a statement column (txn_id, date, amount, reference, payer)")
@@ -165,13 +170,16 @@ def _cmd_reconcile(client: Any, args: argparse.Namespace) -> int:
     columns = dict(m.split("=", 1) for m in args.map)
     lines = parse_statement(args.statement, columns)
     log = JsonlLog(DEFAULT_LOG_DIR / "processed.jsonl")
-    results = match_lines(lines, open_invoices(client),
+    invoices = open_invoices(client)
+    results = match_lines(lines, invoices, tolerance=args.tolerance,
                           already_processed=lambda t: log.seen(f"payment:{t}"))
     rows = [[r.line.txn_id, _money(r.line.amount), r.line.reference, r.status,
              (r.invoice.doc_number if r.invoice else "") or "", r.reason] for r in results]
     print(_table(["Txn", "Amount", "Reference", "Status", "Invoice", "Note"], rows))
     if args.apply:
-        summary = apply_matches(client, results, log, deposit_account_id=args.deposit_account)
+        summary = apply_matches(client, results, log, deposit_account_id=args.deposit_account,
+                                all_open=invoices, rollover=args.rollover,
+                                tolerance=args.tolerance)
         print(f"\nPosted {len(summary.posted)} payment(s); {len(summary.skipped)} left for review.")
     else:
         matched = sum(r.status == "matched" for r in results)

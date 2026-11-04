@@ -131,3 +131,64 @@ def test_confidence_scores():
     assert res["UJ1AAA"].confidence == 100  # exact ref, exact amount
     assert res["UJ2BBB"].confidence == 90  # exact ref, partial payment
     assert res["UJ4DDD"].confidence == 70  # bad ref, unique amount
+
+
+def test_short_pay_within_tolerance_is_flagged():
+    ln = StatementLine("UJ8", date(2026, 10, 30), Decimal("44998"), "CO-2026-00446")
+    res = match_lines([ln], INVOICES, tolerance=5)[0]
+    assert res.status == "matched" and res.confidence == 95
+    assert "tolerance" in res.reason
+
+
+def test_partial_beyond_tolerance_reports_remaining():
+    ln = StatementLine("UJ7", date(2026, 10, 30), Decimal("500"), "CO202600447")
+    res = match_lines([ln], INVOICES, tolerance=5)[0]
+    assert res.confidence == 90 and "500 remains" in res.reason
+
+
+def _inv(id_, doc, balance, due, cust="5"):
+    return Invoice.from_api({
+        "Id": id_, "DocNumber": doc, "Balance": balance, "CustomerRef": {"value": cust},
+        "DueDate": due,
+    })
+
+
+def _run_apply(monkeypatch, amount, **kwargs):
+    from qbo_ar.payments import PaymentResult
+    from qbo_ar.reconcile import MatchResult
+
+    seen = {}
+
+    def fake_record_payment(client, customer_id, amt, invoices, **kw):
+        seen.update(amount=amt, pool=[i.id for i in invoices], **kw)
+        return PaymentResult("P1", (), Decimal(0))
+
+    monkeypatch.setattr("qbo_ar.reconcile.record_payment", fake_record_payment)
+    target = _inv("1", "CO-1", 100, "2026-11-30")
+    others = [
+        _inv("2", "CO-2", 60, "2026-10-01"),
+        _inv("3", "CO-3", 200, "2026-10-15"),
+        _inv("4", "CO-4", 500, "2026-09-01", cust="9"),  # other customer: never touched
+    ]
+    line = StatementLine("UJX", date(2026, 11, 4), Decimal(amount), "CO-1")
+    res = MatchResult(line, "matched", target, "", 90)
+    apply_matches(None, [res], None, all_open=[target, *others], **kwargs)
+    return seen
+
+
+def test_overpay_rolls_over_oldest_first_same_customer_only(monkeypatch):
+    seen = _run_apply(monkeypatch, "250", rollover=True)
+    assert seen["strategy"] == "specific"
+    assert seen["targets"] == {"1": None, "2": Decimal("60"), "3": Decimal("90")}
+    assert "4" not in seen["pool"]
+
+
+def test_overpay_without_rollover_keeps_default_allocation(monkeypatch):
+    seen = _run_apply(monkeypatch, "250")
+    assert seen["strategy"] == "oldest_first" and seen["targets"] is None
+    assert seen["pool"] == ["1"]
+
+
+def test_overpay_within_tolerance_is_not_rolled_over(monkeypatch):
+    seen = _run_apply(monkeypatch, "103", rollover=True, tolerance=5)
+    assert seen["strategy"] == "oldest_first"
