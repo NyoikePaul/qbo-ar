@@ -1,6 +1,6 @@
 # QuickBooks AR Toolkit (`qbo-ar`)
 
-[![CI](https://github.com/NyoikePaul/quickbooks/actions/workflows/ci.yml/badge.svg)](https://github.com/NyoikePaul/quickbooks/actions/workflows/ci.yml) ![Python](https://img.shields.io/badge/python-3.10%E2%80%933.13-blue)
+[![CI](https://github.com/NyoikePaul/qbo-ar/actions/workflows/ci.yml/badge.svg)](https://github.com/NyoikePaul/qbo-ar/actions/workflows/ci.yml) ![Python](https://img.shields.io/badge/python-3.10%E2%80%933.13-blue)
 
 A tested Python toolkit for QuickBooks Online **Accounts Receivable**: aging with tie-out,
 idempotent payment posting, M-Pesa/bank statement reconciliation with confidence scoring, a
