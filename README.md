@@ -1,41 +1,12 @@
-# QuickBooks Learning Hub
+# QuickBooks AR Toolkit (`qbo-ar`)
 
-Structured learning repository for **QuickBooks Online** and **QuickBooks Desktop** aimed at Finance / ERP professionals (especially those working with D365).
-
-**Focus Areas**: Daily accounting, best practices, reporting, VAT (Kenya), and integration patterns.
-
-## Learning Roadmap
-
-### Phase 1: Fundamentals
-- Company Setup & Preferences
-- Chart of Accounts (Best Practices)
-- Customers, Vendors, Items
-- Banking & Reconciliation
-
-### Phase 2: Core Operations
-- Sales Cycle
-- Purchase Cycle
-- Journal Entries & Adjustments
-- Tax & VAT Handling
-
-### Phase 3: Advanced
-- Reports & Custom Reports
-- Accountant Tools
-- Budgeting
-- Multi-currency
-
-### Phase 4: Integration
-- QuickBooks API
-- Data Import/Export
-- Integration with D365 / Power Automate
-
-## AR Toolkit (`qbo-ar`)
+[![CI](https://github.com/NyoikePaul/quickbooks/actions/workflows/ci.yml/badge.svg)](https://github.com/NyoikePaul/quickbooks/actions/workflows/ci.yml) ![Python](https://img.shields.io/badge/python-3.10%E2%80%933.13-blue)
 
 A tested Python toolkit for QuickBooks Online **Accounts Receivable**: aging with tie-out,
 idempotent payment posting, M-Pesa/bank statement reconciliation with confidence scoring, a
 suspense queue with payer suggestions, and collections reminders.
 
-### Setup (Linux / WSL, Python 3.10+)
+## Setup (Linux / WSL, Python 3.10+)
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
@@ -53,7 +24,7 @@ stores the token and does not validate it, so run `aging` straight after; `inval
 the token is stale or mistyped, so generate a fresh one in the playground. Intuit rotates
 refresh tokens, and the toolkit keeps the current one in `~/.qbo_ar/tokens.json`.
 
-### Commands
+## Commands
 
 ```bash
 qbo-ar aging --tie-out          # buckets by customer, verified against QuickBooks' report
@@ -65,7 +36,7 @@ qbo-ar metrics --days 90        # DSO, weighted days overdue, top exposures
 
 Anything that writes to QuickBooks is a dry run unless you pass `--send` or `--apply`.
 
-### Reconciling M-Pesa / bank statements
+## Reconciling M-Pesa / bank statements
 
 The statement is a CSV with `Receipt No.`, `Completion Time`, `Details`, `Paid In` and
 `Account No.` columns (the standard M-Pesa layout; remap with `--map`, see
@@ -95,7 +66,7 @@ qbo-ar reconcile statement.csv --queue review.csv     # export unmatched/probabl
   auto-post. Masked M-Pesa numbers (`2547***222`) can collide between payers, so learned
   suggestions are capped at 80 and show how many prior payments they rest on.
 
-### Safety
+## Safety
 
 - Dry run by default; `--apply` and `--send` are the only commands that write.
 - Posting is idempotent per receipt number (local log plus a QuickBooks `requestid`), so
@@ -108,6 +79,35 @@ See [docs/04-integration/accounts-receivable-api.md](docs/04-integration/account
 make test    # 164 unit tests, no network
 make lint
 ```
+
+## Learning resources
+
+This repository also holds a QuickBooks Online / Desktop study roadmap for Finance and ERP professionals: daily accounting, VAT (Kenya) and integration patterns.
+
+### Roadmap
+
+#### Phase 1: Fundamentals
+- Company Setup & Preferences
+- Chart of Accounts (Best Practices)
+- Customers, Vendors, Items
+- Banking & Reconciliation
+
+#### Phase 2: Core Operations
+- Sales Cycle
+- Purchase Cycle
+- Journal Entries & Adjustments
+- Tax & VAT Handling
+
+#### Phase 3: Advanced
+- Reports & Custom Reports
+- Accountant Tools
+- Budgeting
+- Multi-currency
+
+#### Phase 4: Integration
+- QuickBooks API
+- Data Import/Export
+- Integration with D365 / Power Automate
 
 ---
 
