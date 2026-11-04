@@ -113,3 +113,7 @@ This repository also holds a QuickBooks Online / Desktop study roadmap for Finan
 
 **Author:** Nyoike Paul  
 **Started:** June 2026
+
+## License
+
+MIT. See [LICENSE](LICENSE).
