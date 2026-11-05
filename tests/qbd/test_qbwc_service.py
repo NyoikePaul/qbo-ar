@@ -438,3 +438,37 @@ def test_soap_rejects_unknown_path(tmp_path):
     )
 
     assert response["status"] == "404 Not Found"
+
+
+def test_soap_unexpected_error_returns_generic_fault(tmp_path, monkeypatch, caplog):
+    _, _, service = make_service(tmp_path)
+
+    def boom(self, *args):
+        raise RuntimeError("secret path /home/paul/.qbd_ar/queue.sqlite3")
+
+    monkeypatch.setattr(type(service), "serverVersion", boom)
+    app = create_soap_application(service)
+
+    with caplog.at_level("ERROR"):
+        response, output = call_wsgi(app, method="POST", body=soap_request("serverVersion"))
+
+    assert response["status"] == "500 Internal Server Error"
+    assert b"Internal server error" in output
+    assert b"secret path" not in output
+    assert "secret path" in caplog.text  # details stay in the local log
+
+
+def test_soap_rejects_entity_declarations(tmp_path):
+    _, _, service = make_service(tmp_path)
+    app = create_soap_application(service)
+    bomb = (
+        '<?xml version="1.0"?><!DOCTYPE lolz [<!ENTITY a "lol">'
+        '<!ENTITY b "&a;&a;&a;&a;">]>'
+        f'<soap:Envelope xmlns:soap="{SOAP_NS}"><soap:Body>&b;</soap:Body></soap:Envelope>'
+    ).encode()
+
+    response, output = call_wsgi(app, method="POST", body=bomb)
+
+    assert response["status"] == "500 Internal Server Error"
+    assert ET.fromstring(output).find(f".//{{{SOAP_NS}}}Fault") is not None
+    assert b"lollol" not in output
