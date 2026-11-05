@@ -3,6 +3,8 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: SemVer.
 
 ## [Unreleased]
+
+## [0.3.0] - 2026-11-05
 ### Added
 - `dunning` writes to the same audit trail (attempt recorded before each resend).
 - Audit trail (`~/.qbo_ar/audit.jsonl`): run id, UTC timestamps, every match decision, and
