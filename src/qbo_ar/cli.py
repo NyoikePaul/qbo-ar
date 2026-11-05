@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from collections.abc import Sequence
@@ -178,21 +179,50 @@ def _cmd_reconcile(client: Any, args: argparse.Namespace) -> int:
     rows = [[r.line.txn_id, _money(r.line.amount), r.line.reference, r.status,
              (r.invoice.doc_number if r.invoice else "") or "", r.reason] for r in results]
     print(_table(["Txn", "Amount", "Reference", "Status", "Invoice", "Note"], rows))
+    from .audit import AuditLog
     from .suspense import DEFAULT_PAYER_MAP, PayerMap, learn_from_posted, write_queue
 
     payers = PayerMap(DEFAULT_PAYER_MAP)
+    audit = AuditLog(DEFAULT_LOG_DIR / "audit.jsonl")
+    audit.record(
+        "reconcile_started",
+        environment=os.environ.get("QBO_ENVIRONMENT", ""),
+        statement=getattr(args.statement, "name", ""),
+        lines=len(lines),
+        apply=bool(args.apply),
+        tolerance=str(args.tolerance),
+        rollover=bool(args.rollover),
+    )
+    for r in results:
+        audit.record(
+            "match_decision",
+            txn_id=r.line.txn_id,
+            amount=str(r.line.amount),
+            reference=r.line.reference,
+            status=r.status,
+            invoice=r.invoice.doc_number if r.invoice else None,
+            confidence=r.confidence,
+            reason=r.reason,
+        )
     if args.queue:
         count = write_queue(args.queue, results, invoices, payers)
         print(f"\nWrote {count} line(s) to {args.queue} for review.")
     if args.apply:
         summary = apply_matches(client, results, log, deposit_account_id=args.deposit_account,
                                 all_open=invoices, rollover=args.rollover,
-                                tolerance=args.tolerance)
+                                tolerance=args.tolerance, audit=audit)
         print(f"\nPosted {len(summary.posted)} payment(s); {len(summary.skipped)} left for review.")
         learn_from_posted(payers, summary)
+        audit.record(
+            "reconcile_finished",
+            dry_run=False,
+            posted=len(summary.posted),
+            skipped=len(summary.skipped),
+        )
     else:
         matched = sum(r.status == "matched" for r in results)
         print(f"\nDry run: {matched} line(s) would be posted. Re-run with --apply.")
+        audit.record("reconcile_finished", dry_run=True, would_post=matched)
     return 0
 
 

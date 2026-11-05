@@ -191,6 +191,7 @@ def apply_matches(
     all_open: Iterable[Invoice] | None = None,
     rollover: bool = False,
     tolerance: Decimal | int | str = 0,
+    audit: Any | None = None,
 ) -> ApplySummary:
     """Post only `matched` lines. probable/unmatched/duplicate are left for a human."""
     tolerance = Decimal(str(tolerance))
@@ -223,6 +224,14 @@ def apply_matches(
                 targets[other.id] = take
                 left -= take
             pool, strategy = [inv0, *others], "specific"
+        if audit is not None:
+            audit.record(
+                "payment_attempt",
+                txn_id=res.line.txn_id,
+                amount=str(res.line.amount),
+                invoice=res.invoice.doc_number,
+                strategy=strategy,
+            )
         payment = record_payment(
             client,
             res.invoice.customer_id,
@@ -236,5 +245,17 @@ def apply_matches(
             deposit_account_id=deposit_account_id,
             log=log,
         )
+        if audit is not None:
+            audit.record(
+                "payment_posted",
+                txn_id=res.line.txn_id,
+                payment_id=payment.payment_id,
+                allocations=[
+                    {"invoice_id": a.invoice_id, "amount": str(a.amount)}
+                    for a in payment.allocations
+                ],
+                unapplied=str(payment.unapplied),
+                duplicate=payment.duplicate,
+            )
         summary.posted.append((res, payment))
     return summary

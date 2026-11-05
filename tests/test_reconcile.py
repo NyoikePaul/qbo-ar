@@ -192,3 +192,18 @@ def test_overpay_without_rollover_keeps_default_allocation(monkeypatch):
 def test_overpay_within_tolerance_is_not_rolled_over(monkeypatch):
     seen = _run_apply(monkeypatch, "103", rollover=True, tolerance=5)
     assert seen["strategy"] == "oldest_first"
+
+
+class _Recorder:
+    def __init__(self):
+        self.events = []
+
+    def record(self, event, **fields):
+        self.events.append((event, fields))
+
+
+def test_apply_matches_audits_attempt_then_posted(monkeypatch):
+    audit = _Recorder()
+    _run_apply(monkeypatch, "100", audit=audit)
+    assert [e for e, _ in audit.events] == ["payment_attempt", "payment_posted"]
+    assert audit.events[0][1]["txn_id"] == "UJX"
