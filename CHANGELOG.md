@@ -3,6 +3,8 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: SemVer.
 
 ## [Unreleased]
+
+## [0.3.1] - 2026-11-05
 ### Fixed
 - `reconcile` now recognises invoice numbers written with INV/INVOICE/REF/NO prefixes
   (e.g. `INV-1027`) in the reference text.
