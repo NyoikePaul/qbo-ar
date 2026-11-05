@@ -3,6 +3,8 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: SemVer.
 
 ## [Unreleased]
+### Added
+- docs/production-readiness.md: staged checklist before using a real company.
 ### Changed
 - `reconcile --apply` summary separates duplicates (no action needed) from lines that need
   review.
