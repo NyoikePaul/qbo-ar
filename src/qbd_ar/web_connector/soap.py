@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 import xml.etree.ElementTree as ET
 from typing import Any
 from xml.sax.saxutils import quoteattr
+
+import defusedxml.ElementTree as DET
 
 SERVICE_NS = "http://developer.intuit.com/"
 SOAP_NS = "http://schemas.xmlsoap.org/soap/envelope/"
@@ -219,6 +222,9 @@ def _soap_fault(message: str) -> bytes:
     )
 
 
+log = logging.getLogger(__name__)
+
+
 def _local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
@@ -330,7 +336,7 @@ class QBWCSOAPApplication:
             if len(raw) != length:
                 raise ValueError("Incomplete SOAP request body")
 
-            root = ET.fromstring(raw)
+            root = DET.fromstring(raw)
 
             if root.tag != f"{{{SOAP_NS}}}Envelope":
                 raise ValueError("Expected a SOAP 1.1 Envelope")
@@ -361,8 +367,12 @@ class QBWCSOAPApplication:
 
             return self._response(start_response, "200 OK", output)
 
-        except Exception as exc:
+        except (ValueError, ET.ParseError) as exc:
             output = _soap_fault(str(exc))
+            return self._response(start_response, "500 Internal Server Error", output)
+        except Exception:
+            log.exception("Unhandled error while serving a SOAP request")
+            output = _soap_fault("Internal server error")
             return self._response(start_response, "500 Internal Server Error", output)
 
 

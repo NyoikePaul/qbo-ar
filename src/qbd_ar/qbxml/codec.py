@@ -13,6 +13,9 @@ from datetime import date
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
 
+import defusedxml.ElementTree as DET
+from defusedxml import DefusedXmlException
+
 QBXML_VERSION = "13.0"
 ZERO = Decimal("0.00")
 CENT = Decimal("0.01")
@@ -314,8 +317,8 @@ def build_receive_payment_add(
 def parse_responses(xml: str | bytes) -> list[QBXMLResponse]:
     """Parse response status records from QBXMLMsgsRs."""
     try:
-        root = ET.fromstring(xml)
-    except ET.ParseError as exc:
+        root = DET.fromstring(xml)
+    except (ET.ParseError, DefusedXmlException) as exc:
         raise QBXMLError(f"Invalid QuickBooks XML response: {exc}") from exc
 
     messages = root.find(".//QBXMLMsgsRs")
