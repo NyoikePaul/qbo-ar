@@ -185,6 +185,16 @@ def _cmd_dunning(client: Any, args: argparse.Namespace, today: date) -> int:
     return 0
 
 
+def _apply_summary(summary: Any) -> str:
+    """One line for the operator: duplicates need no action, only the rest needs review."""
+    duplicates = sum(r.status == "duplicate" for r in summary.skipped)
+    review = len(summary.skipped) - duplicates
+    return (
+        f"Posted {len(summary.posted)} payment(s); {duplicates} duplicate(s) skipped; "
+        f"{review} need review."
+    )
+
+
 def _cmd_reconcile(client: Any, args: argparse.Namespace) -> int:
     columns = dict(m.split("=", 1) for m in args.map)
     lines = parse_statement(args.statement, columns)
@@ -227,7 +237,7 @@ def _cmd_reconcile(client: Any, args: argparse.Namespace) -> int:
         summary = apply_matches(client, results, log, deposit_account_id=args.deposit_account,
                                 all_open=invoices, rollover=args.rollover,
                                 tolerance=args.tolerance, audit=audit)
-        print(f"\nPosted {len(summary.posted)} payment(s); {len(summary.skipped)} left for review.")
+        print(f"\n{_apply_summary(summary)}")
         learn_from_posted(payers, summary)
         audit.record(
             "reconcile_finished",

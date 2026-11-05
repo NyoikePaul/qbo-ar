@@ -3,6 +3,9 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: SemVer.
 
 ## [Unreleased]
+### Changed
+- `reconcile --apply` summary separates duplicates (no action needed) from lines that need
+  review.
 
 ## [0.3.1] - 2026-11-05
 ### Fixed
