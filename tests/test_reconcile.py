@@ -215,3 +215,34 @@ def test_prefixed_invoice_number_in_reference_is_found():
     assert res.status == "probable"
     assert res.invoice.doc_number == "CO-2026-00500"
     assert res.confidence == 85
+
+
+def test_confirm_promotes_a_probable_line():
+    from qbo_ar.reconcile import confirm_lines
+
+    results = match_lines(lines(), INVOICES)
+    out = confirm_lines(results, ["UJ4DDD"])  # 'wrong ref', unique amount: probable
+    row = next(r for r in out if r.line.txn_id == "UJ4DDD")
+    assert row.status == "matched" and row.invoice.doc_number == "CO-2026-00500"
+    assert "confirmed by operator" in row.reason
+    others = [(r.line.txn_id, r.status) for r in out if r.line.txn_id != "UJ4DDD"]
+    assert others == [(r.line.txn_id, r.status) for r in results if r.line.txn_id != "UJ4DDD"]
+
+
+def test_confirm_refuses_anything_that_is_not_probable():
+    from qbo_ar.reconcile import confirm_lines
+
+    results = match_lines(lines(), INVOICES)
+    with pytest.raises(ValueError):
+        confirm_lines(results, ["UJ1AAA"])  # already matched
+    with pytest.raises(ValueError):
+        confirm_lines(results, ["NOPE"])  # unknown receipt
+
+
+def test_confirm_deduplicates_repeated_receipts():
+    from qbo_ar.reconcile import confirm_lines
+
+    results = match_lines(lines(), INVOICES)
+    out = confirm_lines(results, ["UJ4DDD", "UJ4DDD"])
+    assert sum(r.status == "matched" for r in out) == sum(
+        r.status == "matched" for r in results) + 1

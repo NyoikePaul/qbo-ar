@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: Se
 ## [Unreleased]
 ### Added
 - docs/production-readiness.md: staged checklist before using a real company.
+- `reconcile --confirm RECEIPT`: an operator can promote a `probable` line to `matched`;
+  anything else is refused, and the confirmation is written to the audit trail.
 ### Changed
 - `reconcile --apply` summary separates duplicates (no action needed) from lines that need
   review.

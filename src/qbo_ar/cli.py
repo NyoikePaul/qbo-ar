@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import os
 import sys
@@ -22,7 +23,7 @@ from .customers import fetch_customers
 from .dunning import build_reminders, send_reminders, write_csv
 from .invoices import open_invoices
 from .metrics import concentration, period_dso, weighted_days_overdue
-from .reconcile import apply_matches, match_lines, parse_statement
+from .reconcile import apply_matches, confirm_lines, match_lines, parse_statement
 from .reports import fetch_aged_receivables, fetch_aging, tie_out
 from .util import JsonlLog
 
@@ -85,6 +86,8 @@ def build_parser() -> argparse.ArgumentParser:
     rec.add_argument("--map", action="append", default=[], metavar="FIELD=COLUMN",
                      help="override a statement column (txn_id, date, amount, reference, payer)")
     rec.add_argument("--apply", action="store_true", help="post matched lines as payments")
+    rec.add_argument("--confirm", action="append", default=[], metavar="RECEIPT",
+                     help="treat this 'probable' receipt as matched (repeatable)")
     rec.add_argument("--deposit-account", help="QuickBooks account id to deposit to")
 
     met = sub.add_parser("metrics", help="DSO, days overdue and concentration")
@@ -202,6 +205,12 @@ def _cmd_reconcile(client: Any, args: argparse.Namespace) -> int:
     invoices = open_invoices(client)
     results = match_lines(lines, invoices, tolerance=args.tolerance,
                           already_processed=lambda t: log.seen(f"payment:{t}"))
+    if args.confirm:
+        try:
+            results = confirm_lines(results, args.confirm)
+        except ValueError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
     rows = [[r.line.txn_id, _money(r.line.amount), r.line.reference, r.status,
              (r.invoice.doc_number if r.invoice else "") or "", r.reason] for r in results]
     print(_table(["Txn", "Amount", "Reference", "Status", "Invoice", "Note"], rows))
@@ -219,6 +228,12 @@ def _cmd_reconcile(client: Any, args: argparse.Namespace) -> int:
         tolerance=str(args.tolerance),
         rollover=bool(args.rollover),
     )
+    if args.confirm:
+        audit.record(
+            "operator_confirmed",
+            operator=getpass.getuser(),
+            txn_ids=sorted(set(args.confirm)),
+        )
     for r in results:
         audit.record(
             "match_decision",
