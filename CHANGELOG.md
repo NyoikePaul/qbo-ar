@@ -4,6 +4,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: Se
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-05
+
 ## [0.3.0] - 2026-11-05
 ### Added
 - `dunning` writes to the same audit trail (attempt recorded before each resend).
