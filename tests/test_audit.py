@@ -38,9 +38,11 @@ def test_secrets_are_redacted_recursively():
 
 def test_caller_cannot_override_reserved_fields(tmp_path):
     log = AuditLog(tmp_path / "a.jsonl", run_id="r1", clock=fixed)
-    entry = log.record("e", ts="forged", run_id="forged", event="forged")
+    entry = log.record("e", ts="forged", run_id="forged")
     assert (entry["ts"], entry["run_id"], entry["event"]) == (
         "2026-11-05T08:00:00+00:00", "r1", "e")
+    with pytest.raises(TypeError):  # `event` is positional-only in practice
+        log.record("e", event="forged")
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX permissions")
