@@ -2,6 +2,14 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: SemVer.
 
+## [0.2.1] - 2026-11-05
+### Fixed
+- Package metadata said 0.1.0 while the 0.2.0 tag was published; a test now guards this.
+### Added
+- Security baseline: SECURITY.md, CodeQL, Dependabot, secret scanning with push protection.
+- QuickBooks Desktop Web Connector: durable request queue, SOAP service and sessions (`qbd_ar`).
+- Coverage floor (93%) and a dependency audit job in CI.
+
 ## [0.2.0] - 2026-11-04
 ### Added
 - `reconcile`: match confidence scores, invoice number detection inside reference text,
