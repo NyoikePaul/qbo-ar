@@ -72,17 +72,17 @@ def allocate(
             raise ValueError("The 'specific' strategy needs targets")
         by_id = {i.id: i for i in open_}
         for inv_id, wanted in targets.items():
-            inv = by_id.get(inv_id)
-            if inv is None:
+            target = by_id.get(inv_id)
+            if target is None:
                 raise ValueError(f"Invoice {inv_id} is not open for this customer")
-            applied = inv.balance if wanted is None else quantize_money(Decimal(wanted))
-            if applied <= 0 or applied > inv.balance:
+            applied = target.balance if wanted is None else quantize_money(Decimal(wanted))
+            if applied <= 0 or applied > target.balance:
                 raise ValueError(
-                    f"Invalid amount {applied} for invoice {inv_id} (balance {inv.balance})"
+                    f"Invalid amount {applied} for invoice {inv_id} (balance {target.balance})"
                 )
             if applied > remaining:
                 raise ValueError("Targets exceed the payment amount")
-            allocations.append(Allocation(inv.id, inv.doc_number, applied))
+            allocations.append(Allocation(target.id, target.doc_number, applied))
             remaining -= applied
     else:
         raise ValueError(f"Unknown strategy: {strategy!r}")
