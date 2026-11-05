@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qbo-ar"
-version = "0.1.0"
+version = "0.2.1"
 description = "Accounts Receivable toolkit for the QuickBooks Online API: aging, payments, reconciliation, dunning"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -12,7 +12,7 @@ authors = [{ name = "Paul Kamau Nyoike" }]
 dependencies = ["requests>=2.31"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.5"]
+dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.5"]
 
 [project.scripts]
 qbo-ar = "qbo_ar.cli:main"
@@ -30,3 +30,11 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.coverage.run]
+source = ["qbo_ar"]
+
+[tool.coverage.report]
+fail_under = 93
+show_missing = true
+skip_covered = true
