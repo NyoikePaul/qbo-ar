@@ -207,3 +207,11 @@ def test_apply_matches_audits_attempt_then_posted(monkeypatch):
     _run_apply(monkeypatch, "100", audit=audit)
     assert [e for e, _ in audit.events] == ["payment_attempt", "payment_posted"]
     assert audit.events[0][1]["txn_id"] == "UJX"
+
+
+def test_prefixed_invoice_number_in_reference_is_found():
+    ln = StatementLine("UJP1", date(2026, 11, 5), Decimal("999"), "INV-CO-2026-00500")
+    res = match_lines([ln], INVOICES)[0]
+    assert res.status == "probable"
+    assert res.invoice.doc_number == "CO-2026-00500"
+    assert res.confidence == 85

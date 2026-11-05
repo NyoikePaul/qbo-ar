@@ -94,6 +94,9 @@ class MatchResult:
     confidence: int = 0  # 100 exact, 90 partial/over, 85 ref in text, 70 amount only
 
 
+_REF_PREFIXES = ("INVOICE", "INV", "REF", "NO")  # longest first
+
+
 def _invoice_in_text(
     texts: Iterable[str | None], by_ref: dict[str, Invoice], ambiguous: set[str]
 ) -> Invoice | None:
@@ -102,6 +105,10 @@ def _invoice_in_text(
     for text in texts:
         for token in re.split(r"[\s,;:/|]+", text or ""):
             key = normalize_ref(token)
+            for prefix in _REF_PREFIXES:
+                if key.startswith(prefix) and key[len(prefix):] in by_ref:
+                    key = key[len(prefix):]
+                    break
             if key and key in by_ref and key not in ambiguous:
                 found.add(key)
     return by_ref[next(iter(found))] if len(found) == 1 else None
