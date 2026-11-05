@@ -66,6 +66,21 @@ qbo-ar reconcile statement.csv --queue review.csv     # export unmatched/probabl
   auto-post. Masked M-Pesa numbers (`2547***222`) can collide between payers, so learned
   suggestions are capped at 80 and show how many prior payments they rest on.
 
+## QuickBooks Desktop (optional)
+
+`qbd_ar` is a QuickBooks Web Connector (QBWC) SOAP service with a durable request queue for
+QuickBooks Desktop. It needs one extra dependency:
+
+```bash
+pip install -e ".[qbd]"
+export QBWC_USERNAME=... QBWC_PASSWORD=...   # required; the server refuses to start without them
+python -m qbd_ar.web_connector.server        # development server, 127.0.0.1:8000
+```
+
+The built-in server is for development only. Run it behind HTTPS and a production WSGI
+server for real use. XML is parsed with `defusedxml`, and unexpected errors return a generic
+SOAP fault while the details go to the local log.
+
 ## Safety
 
 - Dry run by default; `--apply` and `--send` are the only commands that write.
