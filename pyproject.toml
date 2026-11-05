@@ -32,7 +32,7 @@ target-version = "py310"
 select = ["E", "F", "I", "UP", "B"]
 
 [tool.coverage.run]
-source = ["qbo_ar"]
+source = ["qbo_ar", "qbd_ar"]
 
 [tool.coverage.report]
 fail_under = 93
@@ -41,6 +41,6 @@ skip_covered = true
 
 [tool.mypy]
 python_version = "3.10"
-files = ["src/qbo_ar"]
+files = ["src/qbo_ar", "src/qbd_ar"]
 warn_unused_ignores = true
 warn_redundant_casts = true

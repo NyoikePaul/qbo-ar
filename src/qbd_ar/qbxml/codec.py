@@ -88,14 +88,16 @@ def _append_ref(
     list_id: str | None = None,
     full_name: str | None = None,
 ) -> ET.Element:
-    if bool(list_id) == bool(full_name):
+    if list_id and not full_name:
+        child_tag, child_value = "ListID", list_id
+    elif full_name and not list_id:
+        child_tag, child_value = "FullName", full_name
+    else:
         raise QBXMLError(
             f"{tag} requires exactly one of list_id or full_name"
         )
 
     node = ET.SubElement(parent, tag)
-    child_tag = "ListID" if list_id else "FullName"
-    child_value = list_id if list_id else full_name
     _append_text(node, child_tag, _required(child_value, tag))
     return node
 
