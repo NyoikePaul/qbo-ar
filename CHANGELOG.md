@@ -2,6 +2,11 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: SemVer.
 
+## [Unreleased]
+### Security
+- QuickBooks Desktop connector parses XML with `defusedxml` (DTDs and entities rejected).
+- SOAP faults no longer echo unexpected internal error text; details are logged locally.
+
 ## [0.2.1] - 2026-11-05
 ### Fixed
 - Package metadata said 0.1.0 while the 0.2.0 tag was published; a test now guards this.
