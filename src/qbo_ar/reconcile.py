@@ -118,13 +118,13 @@ def match_lines(
     open_ = [i for i in invoices if i.balance > 0]
     by_ref: dict[str, Invoice] = {}
     ambiguous: set[str] = set()
-    for inv in open_:
-        key = normalize_ref(inv.doc_number)
+    for candidate in open_:
+        key = normalize_ref(candidate.doc_number)
         if not key:
             continue
         if key in by_ref:
             ambiguous.add(key)
-        by_ref[key] = inv
+        by_ref[key] = candidate
 
     lines = list(lines)
     emitted: set[str] = set()
@@ -200,7 +200,9 @@ def apply_matches(
         if res.status != "matched" or res.invoice is None or res.invoice.customer_id is None:
             summary.skipped.append(res)
             continue
-        pool, strategy, targets = [res.invoice], "oldest_first", None
+        pool = [res.invoice]
+        strategy = "oldest_first"
+        targets: dict[str, Decimal | None] | None = None
         excess = res.line.amount - res.invoice.balance
         if rollover and excess > tolerance:
             inv0 = res.invoice

@@ -99,9 +99,9 @@ def suggest(res: MatchResult, invoices: Iterable[Invoice], payers: PayerMap) -> 
     for key in payer_keys(res.line.payer):
         hit = payers.get(key)
         if hit:
-            inv = oldest.get(hit["customer_id"])
+            first = oldest.get(hit["customer_id"])
             why = f"learned from {hit['count']} prior payment(s)"
-            return Suggestion(hit["customer_name"], (inv.doc_number or "") if inv else "",
+            return Suggestion(hit["customer_name"], (first.doc_number or "") if first else "",
                               LEARNED_SCORE, why)
 
     _, name = split_payer(res.line.payer)
