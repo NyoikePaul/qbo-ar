@@ -11,3 +11,9 @@ __pycache__/
 build/
 dist/
 .qbo_ar/
+
+# coverage
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
