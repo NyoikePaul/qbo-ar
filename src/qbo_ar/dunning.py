@@ -128,6 +128,7 @@ def send_reminders(
     customers: dict[str, Customer] | None = None,
     *,
     dry_run: bool = True,
+    audit: Any | None = None,
 ) -> list[SendOutcome]:
     """Resend the oldest overdue invoice via QuickBooks (its own template) once per tier."""
     outcomes = []
@@ -143,7 +144,22 @@ def send_reminders(
         elif dry_run:
             outcomes.append(SendOutcome(r, oldest.id, "would_send"))
         else:
+            if audit is not None:
+                audit.record(
+                    "dunning_attempt",
+                    customer_id=r.customer_id,
+                    tier=r.tier.name,
+                    invoice_id=oldest.id,
+                )
             send_invoice(client, oldest.id, _email_for(customers, r.customer_id))
             log.add(key, customer_id=r.customer_id, tier=r.tier.name)
             outcomes.append(SendOutcome(r, oldest.id, "sent"))
+        if audit is not None:
+            audit.record(
+                "dunning_decision",
+                customer_id=r.customer_id,
+                tier=r.tier.name,
+                invoice_id=outcomes[-1].invoice_id,
+                action=outcomes[-1].action,
+            )
     return outcomes

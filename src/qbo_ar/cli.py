@@ -160,7 +160,23 @@ def _cmd_dunning(client: Any, args: argparse.Namespace, today: date) -> int:
         write_csv(reminders, args.csv)
     customers = fetch_customers(client, (r.customer_id for r in reminders if r.customer_id))
     log = JsonlLog(DEFAULT_LOG_DIR / "dunning.jsonl")
-    outcomes = send_reminders(client, reminders, log, customers, dry_run=not args.send)
+    from .audit import AuditLog
+
+    audit = AuditLog(DEFAULT_LOG_DIR / "audit.jsonl")
+    audit.record(
+        "dunning_started",
+        environment=os.environ.get("QBO_ENVIRONMENT", ""),
+        send=bool(args.send),
+        reminders=len(reminders),
+    )
+    outcomes = send_reminders(
+        client, reminders, log, customers, dry_run=not args.send, audit=audit
+    )
+    audit.record(
+        "dunning_finished",
+        dry_run=not args.send,
+        sent=sum(o.action == "sent" for o in outcomes),
+    )
     rows = [[o.reminder.customer_name, o.reminder.tier.name, o.reminder.oldest_days_overdue,
              _money(o.reminder.overdue_total), o.action] for o in outcomes]
     print(_table(["Customer", "Tier", "Oldest (days)", "Overdue", "Action"], rows))
