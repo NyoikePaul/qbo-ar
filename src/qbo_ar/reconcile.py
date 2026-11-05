@@ -10,7 +10,7 @@ from __future__ import annotations
 import csv
 import re
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, TextIO
@@ -181,6 +181,30 @@ def match_lines(
             why = "ambiguous reference" if key in ambiguous else "no matching reference"
             results.append(MatchResult(ln, "unmatched", None, why))
     return results
+
+
+def confirm_lines(
+    results: Iterable[MatchResult], txn_ids: Iterable[str]
+) -> list[MatchResult]:
+    """Promote operator-confirmed `probable` lines to `matched`.
+
+    Anything that is not a probable line with a known invoice is refused, so a typo in a
+    receipt number can never post money.
+    """
+    out = list(results)
+    for txn_id in dict.fromkeys(txn_ids):
+        for i, res in enumerate(out):
+            is_probable = res.status == "probable" and res.invoice is not None
+            if res.line.txn_id == txn_id and is_probable:
+                out[i] = replace(
+                    res, status="matched", reason=f"confirmed by operator ({res.reason})"
+                )
+                break
+        else:
+            raise ValueError(
+                f"cannot confirm {txn_id!r}: no probable line with that receipt number"
+            )
+    return out
 
 
 @dataclass
