@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qbo-ar"
-version = "0.2.1"
+version = "0.3.0"
 description = "Accounts Receivable toolkit for the QuickBooks Online API: aging, payments, reconciliation, dunning"
 readme = "README.md"
 requires-python = ">=3.10"
