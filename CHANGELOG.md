@@ -3,6 +3,10 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: SemVer.
 
 ## [Unreleased]
+### Added
+- Audit trail (`~/.qbo_ar/audit.jsonl`): run id, UTC timestamps, every match decision, and
+  payment attempts recorded before posting; secrets redacted, payer text never logged.
+
 ### Security
 - QuickBooks Desktop connector parses XML with `defusedxml` (DTDs and entities rejected).
 - SOAP faults no longer echo unexpected internal error text; details are logged locally.
